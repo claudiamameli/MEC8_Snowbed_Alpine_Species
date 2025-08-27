@@ -18,9 +18,7 @@ colnames(df_species_tot)[grepl("Sibbaldia", colnames(df_species_tot))]
 df_species <- df_species_tot %>% 
   select("logger_ID", "Gnaphalium.supinum", "Luzula.alpino.pilosa", "Salix.herbacea", "Sibbaldia.procumbens")
 
-write.csv(df_species, "~/Desktop/GitHub/MEC8_Snowbed_Alpine_Species/Data/df_species.csv")
-
-
+# write.csv(df_species, "~/Desktop/GitHub/MEC8_Snowbed_Alpine_Species/Data/df_species.csv", overwrite = F)
 
 # Geo Data  Import & Cleanup ----------------------------------------------------------------
 st_layers("~/Desktop/GitHub/MEC8_Snowbed_Alpine_Species/Data/site_data.gpkg")
