@@ -9,6 +9,9 @@ library(terra)
 library(sf)
 library(rworldmap)
 library(gpkg)
+library(raster)
+library(igraph)
+
 
 
 # 1. DATA IMPORT & CLEANUP---------------------------------------------------------
@@ -26,7 +29,7 @@ df_species_bin <- df_species_tot
 df_species_bin[ , -1] <- as.factor(ifelse(df_species_bin[ , -1] > 0, 1, 0))
 
 target_species <- df_species_bin %>% 
-  select("logger_ID", "Gnaphalium.supinum", "Luzula.alpino.pilosa", "Salix.herbacea", "Sibbaldia.procumbens")
+  dplyr::select("logger_ID", "Gnaphalium.supinum", "Luzula.alpino.pilosa", "Salix.herbacea", "Sibbaldia.procumbens")
 
 
 
@@ -37,27 +40,28 @@ target_species <- df_species_bin %>%
 st_layers("~/Desktop/GitHub/MEC8_Snowbed_Alpine_Species/Data/site_data.gpkg")
 geo_data_full <- read_sf("~/Desktop/GitHub/MEC8_Snowbed_Alpine_Species/Data/site_data.gpkg")
 
-plot(geo_data$geom)
+plot(geo_data_full$geom)
 
 all_data <- target_species %>% 
-  left_join(select(geo_data_full, logger_ID, geom), by = "logger_ID")
+  left_join(dplyr::select(geo_data_full, logger_ID, geom), by = "logger_ID")
 
 
 g_supinum_data <- all_data %>%
   mutate(pres = Gnaphalium.supinum) %>% 
-  select("logger_ID", "pres", "geom")
+  dplyr::select("logger_ID", "pres", "geom")
 
 l_alpinospinosa_data <- all_data %>%
   mutate(pres = Luzula.alpino.pilosa) %>% 
-  select("logger_ID", "pres", "geom")
+  dplyr::select("logger_ID", "pres", "geom")
 
 s_herbacea_data <- all_data %>%
   mutate(pres = Salix.herbacea) %>% 
-  select("logger_ID", "pres" , "geom")
+  dplyr::select("logger_ID", "pres" , "geom")
 
 s_procumbens_data <- all_data %>%
   mutate(pres = Sibbaldia.procumbens) %>% 
-  select("logger_ID", "pres", "geom")
+  dplyr::select("logger_ID", "pres", "geom")
+
 ## 1.3 Snowcover Data -------------------------------------------------------------
 snowbeds_tif <- list.files("~/Desktop/GitHub/MEC8_Snowbed_Alpine_Species/Data/snow_cover_maps" ,pattern = "tif$", full.names=T)
 
@@ -97,13 +101,13 @@ points(s_herbacea_data$geom[s_herbacea_data$pres == 1], col="blue", pch = 16, ce
 points(s_procumbens_data$geom[s_procumbens_data$pres ==1], col="green", pch = 16, cex=1)
 
 
-pres_1_7_mean <- terra::extract(snowbed_pres_1_7_sum, geo_data, ID = FALSE)
+pres_1_7_mean <- terra::extract(snowbed_pres_1_7_sum, geo_data_full, ID = FALSE)
 names(pres_1_7_mean) <- "pres_1_7"
-fut_1_7_mean <- terra::extract(snowbed_fut_1_7_sum, geo_data, ID = FALSE)
+fut_1_7_mean <- terra::extract(snowbed_fut_1_7_sum, geo_data_full, ID = FALSE)
 names(fut_1_7_mean) <- "fut_1_7"
-pres_1_5_mean <- terra::extract(snowbed_pres_1_5_sum, geo_data, ID = FALSE)
+pres_1_5_mean <- terra::extract(snowbed_pres_1_5_sum, geo_data_full, ID = FALSE)
 names(pres_1_5_mean) <- "pres_1_5"
-fut_1_5_mean <- terra::extract(snowbed_fut_1_5_sum, geo_data, ID = FALSE)
+fut_1_5_mean <- terra::extract(snowbed_fut_1_5_sum, geo_data_full, ID = FALSE)
 names(fut_1_5_mean) <- "fut_1_5"
 
 g_supinum_data <- data.frame(g_supinum_data, pres_1_7_mean, fut_1_7_mean, pres_1_5_mean, fut_1_5_mean)
@@ -217,14 +221,108 @@ tol <- 0.5
 trials <- ifel(
   abs(trials - g_supinum_mean) <= tol,
   1,
-  0)
+  NA)
 
 trials_fut <- ifel(
   abs(trials_fut - g_supinum_mean) <= tol,
   1,
-  0)
+  NA)
 
 
-plot(trials)
-plot(trials_fut)
+plot(trials, col = "black")
+plot(trials_fut, col = "black")
 
+
+# Create polygons - trials ---------------------------------------------------------
+patch_data_trial <- patches(trials, directions = 8)
+
+patch_prelim <- freq(patch_data_trial, bylayer = FALSE)  
+cell_area <- 1 # areas of cells are 1 m2
+patch_prelim$area_m2 <- patch_prelim$count * cell_area
+
+patch_polygons <- as.polygons(patch_data_trial, dissolve = TRUE)
+df_centroids<- crds(centroids(patch_polygons), df = TRUE)
+plot(patch_polygons)
+
+patch_info <- data.frame(
+  patch_ID = patch_polygons$patches,
+  cell_count = patch_prelim$count,
+  area_m2 = patch_prelim$area_m2,
+  longitude = df_centroids$x,
+  latitude = df_centroids$y
+)
+
+#Try buffering???
+# Buffer to merge patches 1 cell apart
+buffer_width <- cell_area
+patch_polys_buffered <- buffer(patch_polygons, width = buffer_width)
+
+r <- rast(trials)
+r <- rasterize(patch_polys_buffered, r, field=1)
+plot(r, col = "black")
+
+communal_patches <- patches(r, directions = 8)
+communal_polygons <- as.polygons(communal_patches, dissolve = TRUE)
+
+areas <- expanse(communal_polygons, unit = "m")
+centroids <- crds(centroids(communal_polygons), df = TRUE)
+
+merged_patch_info <- data.frame(
+  patch_ID = communal_polygons$patches,
+  area_m2 = areas,
+  longitude = centroids$x,
+  latitude = centroids$y
+)
+
+
+dim(patch_info)
+dim(merged_patch_info)
+head(patch_info)
+head(merged_patch_info)
+
+quartz()
+
+ggplot(data=patch_info, 
+       aes(x=longitude, y=latitude, 
+           #size=area_m2
+           )) +
+  geom_point() +
+  #geom_text(aes(label=patch_ID), hjust=-0.1, vjust=-0.1, col="darkgrey", size=4) +
+  coord_fixed() +
+  labs(size="Patch area\n(m2)") +
+  theme_bw() +
+  theme(axis.title=element_blank(), axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background=element_rect(fill="white", colour="grey"),
+        panel.grid.major=element_line(colour="grey"),
+        legend.position="bottom")
+
+
+quartz()
+ggplot(data=merged_patch_info, 
+       aes(x=longitude, y=latitude, 
+           #size=area_m2
+           )) +
+  geom_point() +
+  #geom_text(aes(label=patch_ID), hjust=-0.1, vjust=-0.1, col="darkgrey", size=4) +
+  coord_fixed() +
+  labs(size="Patch area\n(m2)") +
+  theme_bw() +
+  theme(axis.title=element_blank(), axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background=element_rect(fill="white", colour="grey"),
+        panel.grid.major=element_line(colour="grey"),
+        legend.position="bottom")
+
+
+
+dim(merged_patch_info)
+dim(patch_info)
+head(merged_patch_info)
+head(patch_info)
+
+
+       
+       
+       
+       

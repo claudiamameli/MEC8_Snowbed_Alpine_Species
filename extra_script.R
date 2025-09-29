@@ -1,4 +1,4 @@
-Extraction of Snowcover days - Function ---------------------------------
+# Extraction of Snowcover days - Function ---------------------------------
   # this function will output a dataframe with values representing number of days of snowcover for each plot containing species, calculates a mean number of days for each plot and includes original logger_ID ang geom points
   
   snowcover_days_fun <- function(species_data, raster_list){
