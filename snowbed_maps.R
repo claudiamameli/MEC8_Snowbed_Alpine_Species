@@ -246,13 +246,12 @@ plot(patch_polygons)
 
 patch_info <- data.frame(
   patch_ID = patch_polygons$patches,
-  cell_count = patch_prelim$count,
   area_m2 = patch_prelim$area_m2,
   longitude = df_centroids$x,
   latitude = df_centroids$y
 )
 
-#Try buffering???
+# Try buffering???
 # Buffer to merge patches 1 cell apart
 buffer_width <- cell_area
 patch_polys_buffered <- buffer(patch_polygons, width = buffer_width)
@@ -320,6 +319,86 @@ dim(merged_patch_info)
 dim(patch_info)
 head(merged_patch_info)
 head(patch_info)
+
+
+# future trials  ----------------------------------------------------------
+
+fut_patch_data_trial <- patches(trials_fut, directions = 8)
+
+fut_patch_prelim <- freq(fut_patch_data_trial, bylayer = FALSE)  
+cell_area <- 1 # areas of cells are 1 m2
+fut_patch_prelim$area_m2 <- fut_patch_prelim$count * cell_area
+
+fut_patch_polygons <- as.polygons(fut_patch_data_trial, dissolve = TRUE)
+fut_df_centroids<- crds(centroids(fut_patch_polygons), df = TRUE)
+plot(fut_patch_polygons)
+
+fut_patch_info <- data.frame(
+  patch_ID = fut_patch_polygons$patches,
+  area_m2 = fut_patch_prelim$area_m2,
+  longitude = fut_df_centroids$x,
+  latitude = fut_df_centroids$y
+)
+
+# Buffered version
+# Buffer to merge patches 1 cell apart
+fut_patch_polys_buffered <- buffer(fut_patch_polygons, width = buffer_width)
+
+r2 <- rast(trials)
+r2 <- rasterize(fut_patch_polys_buffered, r, field=1)
+plot(r2, col = "black")
+
+fut_communal_patches <- patches(r2, directions = 8)
+fut_communal_polygons <- as.polygons(fut_communal_patches, dissolve = TRUE)
+
+fut_areas <- expanse(fut_communal_polygons, unit = "m")
+fut_centroids <- crds(centroids(fut_communal_polygons), df = TRUE)
+
+fut_merged_patch_info <- data.frame(
+  patch_ID = fut_communal_polygons$patches,
+  area_m2 = fut_areas,
+  longitude = fut_centroids$x,
+  latitude = fut_centroids$y
+)
+
+
+dim(fut_patch_info)
+dim(fut_merged_patch_info)
+head(fut_patch_info)
+head(fut_merged_patch_info)
+
+
+ggplot(data=fut_patch_info, 
+       aes(x=longitude, y=latitude, 
+           #size=area_m2
+       )) +
+  geom_point() +
+  #geom_text(aes(label=patch_ID), hjust=-0.1, vjust=-0.1, col="darkgrey", size=4) +
+  coord_fixed() +
+  labs(size="Patch area\n(m2)") +
+  theme_bw() +
+  theme(axis.title=element_blank(), axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background=element_rect(fill="white", colour="grey"),
+        panel.grid.major=element_line(colour="grey"),
+        legend.position="bottom")
+
+
+ggplot(data=fut_merged_patch_info, 
+       aes(x=longitude, y=latitude, 
+           #size=area_m2
+       )) +
+  geom_point() +
+  #geom_text(aes(label=patch_ID), hjust=-0.1, vjust=-0.1, col="darkgrey", size=4) +
+  coord_fixed() +
+  labs(size="Patch area\n(m2)") +
+  theme_bw() +
+  theme(axis.title=element_blank(), axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background=element_rect(fill="white", colour="grey"),
+        panel.grid.major=element_line(colour="grey"),
+        legend.position="bottom")
+
 
 
        
