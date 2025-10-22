@@ -11,6 +11,14 @@ library(rworldmap)
 library(gpkg)
 library(raster)
 library(igraph)
+library(ggplot2)
+library(ggridges)
+library(readxl)
+library(patchwork)
+library(networktools)
+library(cluster)
+library(cowplot)
+library(caseconverter) 
 
 
 
@@ -40,7 +48,7 @@ target_species <- df_species_bin %>%
 st_layers("~/Desktop/GitHub/MEC8_Snowbed_Alpine_Species/Data/site_data.gpkg")
 geo_data_full <- read_sf("~/Desktop/GitHub/MEC8_Snowbed_Alpine_Species/Data/site_data.gpkg")
 
-plot(geo_data_full$geom)
+plot(geo_data_full$geom, asp = 0)
 
 all_data <- target_species %>% 
   left_join(dplyr::select(geo_data_full, logger_ID, geom), by = "logger_ID")
@@ -245,7 +253,7 @@ df_centroids<- crds(centroids(patch_polygons), df = TRUE)
 plot(patch_polygons)
 
 patch_info <- data.frame(
-  patch_ID = patch_polygons$patches,
+  patch = patch_polygons$patches,
   area_m2 = patch_prelim$area_m2,
   longitude = df_centroids$x,
   latitude = df_centroids$y
@@ -267,7 +275,7 @@ areas <- expanse(communal_polygons, unit = "m")
 centroids <- crds(centroids(communal_polygons), df = TRUE)
 
 merged_patch_info <- data.frame(
-  patch_ID = communal_polygons$patches,
+  patch = communal_polygons$patches,
   area_m2 = areas,
   longitude = centroids$x,
   latitude = centroids$y
@@ -355,7 +363,7 @@ fut_areas <- expanse(fut_communal_polygons, unit = "m")
 fut_centroids <- crds(centroids(fut_communal_polygons), df = TRUE)
 
 fut_merged_patch_info <- data.frame(
-  patch_ID = fut_communal_polygons$patches,
+  patch = fut_communal_polygons$patches,
   area_m2 = fut_areas,
   longitude = fut_centroids$x,
   latitude = fut_centroids$y
@@ -400,8 +408,136 @@ ggplot(data=fut_merged_patch_info,
         legend.position="bottom")
 
 
+df_patch <- merged_patch_info
+d <- 2 
+# edge to edge function  --------------------------------------------------
+euclidean_network_e2e <- function(d, df_patch) {
+  # matrix of distances between all pairs of patches
+  mat_dist <- as.matrix(dist(dplyr::select(df_patch, longitude,latitude), method="euclidean", diag=TRUE, upper=TRUE))
 
-       
-       
-       
-       
+  # Calculate and extrapolates the radius of individual patches
+  df_patch$radius <- sqrt(df_patch$area_m2 / pi)
+  radius_list <- dplyr::select(df_patch, radius)
+  
+  
+  # creation a new distance matrix considering edge to edge distance
+  e2e_mat_dist <- mat_dist
+  e2e_mat_dist[] <- 0 
+  
+  
+  #this takes a long time <<<<<<<<<<<<<<<<<<< maybe check if there is a better option?
+  for (i in 1:nrow(mat_dist)) {
+    for (j in 1:ncol(mat_dist)) {
+      e2e_mat_dist[i, j] <- mat_dist[i, j] - (radius_list$radius[i] + radius_list$radius[j])
+    }
+  }
+  
+  # Make sure diagonal and negative values are set to 0 
+  diag(e2e_mat_dist) <- 0 
+  # sum(is.na(e2e_mat_dist))
+  # sum(e2e_mat_dist < 0)
+  e2e_mat_dist[e2e_mat_dist < 0] <- 0
+  # sum(e2e_mat_dist == 0.1)
+  
+  # adjacency matrix - 1 = link between patch i and j; 0 = no link between patch i and j
+  # assign 1 if distance between patch i and j is less or equal to threshold distance
+  # assign 0 if distance between patch i and j is greater than threshold distance
+  m_adj <- e2e_mat_dist
+  m_adj[e2e_mat_dist <= d] <- 1
+  m_adj[e2e_mat_dist > d] <- 0
+  diag(m_adj) <- 0 # set diagonal to 0
+  # sum(m_adj == 1)
+  # sum(m_adj == 0)
+  # sum(diag(m_adj))
+  
+  
+  # # Degree (number of connections) of each patch, uncomment if you want function to create preliminary graphs
+  # deg = rowSums(m_adj)
+  # barplot(deg, main = paste("Degree distribution, d =", d))
+  # hist(deg, main = paste("Degree distribution, d =", d))
+  
+  # Connectance (number of realised links / number of all possible links)
+  n = nrow(m_adj) # number of patches
+  c = sum(m_adj) / (n*(n-1))
+  
+  # create dataframe with connections between patches
+  edge_index <- which(m_adj==1, arr.ind=TRUE)
+  patch_names <- df_patch$patch
+  edges <- data.frame(from = patch_names[edge_index[, "row"]],
+                      to = patch_names[edge_index[, "col"]]) %>%
+    rowwise() %>%
+    mutate(a = min(from, to),
+           b = max(from, to)) %>%
+    ungroup() %>%
+    dplyr::select(from = a, to = b) %>%
+    distinct()
+  
+  # rename site to name (for igraph)
+  nodes <- df_patch %>% rename(name = patch)
+  
+  # create igraph object
+  g <- graph_from_data_frame(d=edges, vertices=nodes, directed=FALSE)
+  
+  
+  # # plot igraph object (Uncomment if you want the function to create preliminary graph)
+  # # define node coordinates (igraph layout)
+  # layout_coords <- layout_coords <- nodes %>%
+  #   select(name, longitude, latitude) %>%
+  #   filter(name %in% V(g)$name) %>% 
+  #   arrange(match(name, V(g)$name)) %>%
+  #   select(longitude, latitude) %>%
+  #   as.matrix()
+  
+  # plot(g,
+  #      layout = layout_coords,
+  #      vertex.size = sqrt(V(g)$area_m2)/200,
+  #      vertex.label = V(g)$name,
+  #      vertex.color = "#56B4E9",
+  #      edge.color = "gray40",
+  #      edge.width = 2,
+  #      main = paste0("Spatial Network, d = ",d) )
+  
+  # Modularity
+  modules <- cluster_infomap(g) #switch to different function if needed
+  m <- modularity(modules)
+  
+  # Centrality metrics
+  c_betwenness <- betweenness(g, directed=FALSE)
+  c_closeness <- closeness(g)
+  # c_bridge <- bridge(g, communities = modules) #takes a long time <<<<<<<<<
+  deg_list <- degree(g)
+  
+  # Compute components
+  comp <- components(g, mode = "weak")  # Use mode = "strong" for directed Strongly Connected Component (SCC)
+  largest_size <- max(comp$csize)  
+  total_nodes <- vcount(g)   
+  fraction <- largest_size / total_nodes  # Fraction of nodes in largest component
+  
+  # Calculate percentage of nodes connected
+  connected_nodes <- sum(deg_list >= 1)
+  percent_connected <- (connected_nodes / nrow(m_adj)) * 100
+  
+  return(list(
+    edge_index = edge_index,
+    distance = d, 
+    connectance = c, 
+    modularity = m,
+    betweenness = c_betwenness,
+    closeness = c_closeness,
+    bridge = c_bridge,
+    degree = deg_list,
+    comp_number = comp$no,
+    largest_comp = largest_size,
+    fraction_comp = fraction,
+    percent_connected = percent_connected,
+    graph = g
+  ))
+}
+      
+
+trial_net <- euclidean_network_e2e(2, merged_patch_info)  
+fut_trial_net <- euclidean_network_e2e(2, fut_merged_patch_info)  
+    
+
+#ADD CHECKS TO SEE WHERE THE HOLD UP IS
+object.size(merged_patch_info) %>% format(units = "Mb")
