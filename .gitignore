@@ -6,3 +6,5 @@
 .RProfile
 Data/*
 Data/.DS_Store
+old_scripts/*
+old_scripts
