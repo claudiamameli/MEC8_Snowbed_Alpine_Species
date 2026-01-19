@@ -46,7 +46,7 @@ target_species <- df_species_bin %>%
 # # Uncomment if need to save the file again
 # write.csv(target_species, "~/Desktop/Repositories/MEC8_Snowbed_Alpine_Species/Data/target_species.csv")
 
-## 1.2 Geo Data  ----------------------------------------------------------------
+## 1.2 Geo Data - Schrankogel ----------------------------------------------------------------
 st_layers("~/Desktop/Repositories/MEC8_Snowbed_Alpine_Species/Data/site_data.gpkg")
 geo_data_full <- read_sf("~/Desktop/Repositories/MEC8_Snowbed_Alpine_Species/Data/site_data.gpkg")
 
@@ -545,11 +545,11 @@ layout_coords <- nodes %>%
 
 plot(g,
      layout = layout_coords,
-     vertex.size = sqrt(V(g)$area_m2)/200,
+     vertex.size = 0.3,
      #vertex.label = V(g)$name,
      vertex.label = "",
-     vertex.color = "#56B4E9",
-     edge.color = "pink",
+     vertex.color = "black",
+     edge.color = "red",
      edge.width = 2,
      main = paste0("Pres Spatial Network, d = ",d) )
 
@@ -566,11 +566,11 @@ layout_coords <- nodes %>%
 
 plot(g2,
      layout = layout_coords,
-     vertex.size = sqrt(V(g2)$area_m2)/200,
+     vertex.size = 0.3,
      #vertex.label = V(g2)$name,
      vertex.label = "",
-     vertex.color = "#56B4E9",
-     edge.color = "pink",
+     vertex.color = "black",
+     edge.color = "red",
      edge.width = 2,
      main = paste0("Fut Spatial Network, d = ",d) )
 
@@ -596,3 +596,4 @@ fut_dist_metrics <-  data.frame(
 
 pres_dist_metrics
 fut_dist_metrics
+

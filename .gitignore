@@ -4,3 +4,5 @@
 .RDataTmp
 .RHistory
 .RProfile
+Data/*
+Data/.DS_Store
