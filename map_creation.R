@@ -20,41 +20,48 @@ library(cluster)
 library(cowplot)
 library(caseconverter) 
 
-# Import data frames ------------------------------------------------------
-path <- "~/Desktop/Repositories/MEC8_Snowbed_Alpine_Species/Data/prelim_dfs"
-files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
+# Import data frames and maps ------------------------------------------------------
+path_df <- "~/Desktop/Repositories/MEC8_Snowbed_Alpine_Species/Data/prelim_dfs"
+files_df <- list.files(path_df, pattern = "\\.csv$", full.names = TRUE)
 
-list2env(setNames(lapply(files, read.csv),
+list2env(setNames(lapply(files_df, read.csv),
     tools::file_path_sans_ext(basename(files))), envir = .GlobalEnv)
 
+path_maps <- "~/Desktop/Repositories/MEC8_Snowbed_Alpine_Species/final_overlay_maps"
 
-# D. BINARY MAPS TRIALS - g_supinum - snow --------------------------------------------------------
+files_rast <- list.files(path_maps ,pattern = "tif$", full.names=T)
 
-trials <- snowbed_pres_1_7_mean
-trials_fut <- snowbed_fut_1_7_mean
+list2env(setNames(lapply(files_rast, rast),
+                  tools::file_path_sans_ext(basename(files_rast))), envir = .GlobalEnv)
 
-g_supinum_mean <- (summary_g_supinum$mean[summary_g_supinum$metric== "snow_pres_1_7"])
+plot(g_supinum_pres_bin)
+plot(g_supinum_fut245_bin)
+plot(g_supinum_fut585_bin)
 
-tol <- 0.5
+# Create polygons ---------------------------------------------------------
+trials <- g_supinum_pres_bin
+trials_fut <- g_supinum_fut245_bin
 
-trials <- ifel(
-  abs(trials - g_supinum_mean) <= tol,
-  1,
-  NA)
+# g_supinum_mean <- (summary_snowcover_1_7$mean[summary_snowcover_1_7$species == "g_supinum"])
+# 
+# tol <- 0.5
+# 
+# trials <- ifel(
+#   abs(trials - g_supinum_mean) <= tol,
+#   1,
+#   NA)
+# 
+# trials_fut <- ifel(
+#   abs(trials_fut - g_supinum_mean) <= tol,
+#   1,
+#   NA)
 
-trials_fut <- ifel(
-  abs(trials_fut - g_supinum_mean) <= tol,
-  1,
-  NA)
 
-
-plot(trials, col = "black")
-plot(trials_fut, col = "black")
-
-
-# Create polygons - trials ---------------------------------------------------------
+# plot(trials, col = "black")
+# plot(trials_fut, col = "black")
 # Create connection with all the cells around it (include corners)
-patch_data_trial <- patches(trials, directions = 8)
+patch_data_trial <- patches(trials, directions = 8, zeroAsNA=T)
+?patches
 
 patch_prelim <- freq(patch_data_trial, bylayer = FALSE)  
 cell_area <- 1 # areas of cells are 1 m2
