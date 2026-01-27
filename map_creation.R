@@ -170,12 +170,17 @@ for(i in names(df_graphs_list)){
 }
 
 
-# Visual comparison of different scenarios --------------------------------
-summary_table_scenarios <- read.csv("~/Desktop/Repositories/MEC8_Snowbed_Alpine_Species/species_specific_df/summary_table_scenarios.csv")
+# 3. Visual comparison of different scenarios --------------------------------
+# Load all previosuly saved dataframes
+path_nodes_df <- "~/Desktop/Repositories/MEC8_Snowbed_Alpine_Species/species_specific_df"
+files_nodes_df <- list.files(path_nodes_df, pattern = "\\.csv$", full.names = TRUE)
 
-summary_table_scenarios
 
+list2env(setNames(lapply(files_nodes_df, read.csv),
+                  tools::file_path_sans_ext(basename(files_nodes_df))),
+         envir = .GlobalEnv)
 
+## 3.1 Line graphs - Summary tables --------------------------------------------
 # Change order to change appearance in the Legends.
 summary_table_scenarios$scenario <- factor(summary_table_scenarios$scenario, levels = c('Present', 'Future 245', 'Future 585'))
 
@@ -243,3 +248,24 @@ ggarrange(total_patches_plot, smallest_area_plot, largest_area_plot,
           common.legend = T,
           legend = "right"
           )
+
+
+## 3.2 Node visualisation ------------------------------------------------------
+ggplot(data=g_supinum_pres_buff0, 
+       aes(x=longitude, y=latitude, 
+          #size=area_m2
+       )) +
+  geom_point(size = 0.5) +
+  coord_fixed() +
+  theme_bw() +
+  labs(title = "Present, Buffer 0") +
+  theme(#axis.title=element_blank(), 
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        #legend.text = element_text(size = 12),
+        #legend.title = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        #axis.title = element_text(size = 14)
+        )
+
+?geom_point

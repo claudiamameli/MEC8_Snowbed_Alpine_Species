@@ -131,7 +131,7 @@ names(pres_temp_rast)
 
 years <- stringr::str_extract(names(pres_temp_rast), "\\d{4}") %>% as.numeric()
 
-temp_pres <- pres_temp_rast[[years >= 2015 & years <= 2025]]
+temp_pres <- pres_temp_rast[[years >= 2015 & years <= 2023]]
 
 #plot(temp_pres)
 
