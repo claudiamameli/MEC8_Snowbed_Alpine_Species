@@ -183,8 +183,11 @@ list2env(setNames(lapply(files_nodes_df, read.csv),
 
 ## 3.1 Line graphs - Summary tables --------------------------------------------
 # Change order to change appearance in the Legends.
-summary_table_scenarios$scenario <- factor(summary_table_scenarios$scenario, levels = c('Present', 'Future 245', 'Future 585'))
-
+summary_table_scenarios$scenario <- factor(
+  summary_table_scenarios$scenario,
+  levels = c("Present", "Future 245", "Future 585"),
+  labels = c("Present", "Future 2–4.5", "Future 5–8.5")
+)
 
 total_patches_plot <- ggplot(data = summary_table_scenarios, 
        aes(x = buffer, y = tot_patches, 
